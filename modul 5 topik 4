@@ -1,0 +1,39 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ==============================
+# 1. Data survei magnetik
+# ==============================
+data = {
+    "X": [0, 0, 50, 50, 100, 100],
+    "Y": [0, 50, 0, 50, 0, 50],
+    "Total_Field": [43210, 43280, 43100, 43420, 43050, 43500]
+}
+
+df = pd.DataFrame(data)
+
+# ==============================
+# 2. Membuat grid dengan pivot_table
+# ==============================
+grid = df.pivot_table(values="Total_Field", index="Y", columns="X")
+
+# Ambil koordinat grid
+X = grid.columns.values
+Y = grid.index.values
+
+Xg, Yg = np.meshgrid(X, Y)
+Z = grid.values
+
+# ==============================
+# 3. Plot kontur
+# ==============================
+plt.figure(figsize=(8, 5))
+plt.contourf(Xg, Yg, Z)
+plt.colorbar(label="Total Field (nT)")
+
+plt.xlabel("X (m)")
+plt.ylabel("Y (m)")
+plt.title("Peta Kontur Anomali Magnetik")
+
+plt.show()
