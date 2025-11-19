@@ -1,0 +1,16 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 1. Buat matriks 20x50 berisi nol
+data = np.zeros((20, 50))
+
+# 2. Ubah nilai di tengah menjadi 1
+data[8:12, 20:30] = 1   # blok anomali
+
+# 3. Tampilkan dengan imshow
+plt.imshow(data, origin='lower', aspect='auto')
+plt.colorbar(label='Nilai')
+plt.title("Model Penampang 2D Sederhana")
+plt.xlabel("Kolom")
+plt.ylabel("Baris")
+plt.show()
