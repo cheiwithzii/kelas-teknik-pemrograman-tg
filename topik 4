@@ -1,0 +1,26 @@
+# ============================================
+# 1. DAFTAR BELANJA
+# ============================================
+
+daftar_belanja = []  # membuat list kosong
+
+print("=== Program Daftar Belanja ===")
+for i in range(3):
+    barang = input(f"Masukkan barang ke-{i+1}: ")
+    daftar_belanja.append(barang)
+
+print("\nDaftar belanja final:", daftar_belanja)
+
+
+# ============================================
+# 2. KONTAK TELEPON
+# ============================================
+
+print("\n=== Program Kontak Telepon ===")
+kontak = {
+    "nama": "Budi",
+    "no_hp": "081234567890",
+    "email": "budi@example.com"
+}
+
+print("Nomor HP teman Anda:", kontak["no_hp"])
