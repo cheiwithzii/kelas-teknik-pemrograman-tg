@@ -1,0 +1,139 @@
+# =======================================================
+# Fungsi QC Seismik
+# =======================================================
+
+def qc_seismik(data, ambang_offset):
+    """
+    data: list of dict, contoh:
+        [
+            {"survey": "S1", "trace_id": 1, "offset": 120},
+            {"survey": "S1", "trace_id": 2, "offset": 80},
+            {"survey": "S2", "trace_id": 1, "offset": 200}
+        ]
+    ambang_offset: nilai ambang batas offset
+    """
+
+    laporan = {}
+
+    for d in data:
+        survey = d["survey"]
+        offset = d["offset"]
+
+        # Menandai trace OK atau BAD
+        if offset > ambang_offset:
+            d["QC_flag"] = "BAD"
+        else:
+            d["QC_flag"] = "OK"
+
+        # Inisialisasi jika survey belum ada dalam laporan
+        if survey not in laporan:
+            laporan[survey] = {"OK": 0, "BAD": 0}
+
+        # Menghitung OK & BAD
+        laporan[survey][d["QC_flag"]] += 1
+
+    return laporan
+
+
+
+# =======================================================
+# Fungsi Statistik Gravitasi
+# =======================================================
+
+def statistik_gravitasi(data):
+    """
+    data: dict example:
+        {
+            "S1": [9.81, 9.75, 9.80],
+            "S2": [9.70, 9.76],
+        }
+    """
+
+    hasil = {}
+    semua_grav = []
+
+    for survey, nilai in data.items():
+
+        # Hitung rata-rata tiap survey
+        rata = sum(nilai) / len(nilai)
+        hasil[survey] = {"rata_rata": rata}
+
+        # Kumpulkan semua nilai gravitasi
+        semua_grav.extend(nilai)
+
+    # nilai terendah & tertinggi dari seluruh survey
+    hasil["min_global"] = min(semua_grav)
+    hasil["max_global"] = max(semua_grav)
+
+    return hasil
+
+
+
+# =======================================================
+# Fungsi Analisis Magnetik
+# =======================================================
+
+def analisis_magnetik(data):
+    """
+    data: dict example:
+        {
+            "S1": [120, 130, 130, 140],
+            "S2": [100, 110, 140, 150]
+        }
+    """
+
+    semua_data = []
+
+    # Menggabungkan nilai magnetik
+    for survey, nilai in data.items():
+        semua_data.extend(nilai)
+
+    # Mencari nilai unik menggunakan set
+    unik = set(semua_data)
+
+    # Mengurutkan hasil
+    unik_sorted = sorted(list(unik))
+
+    return unik_sorted
+
+
+
+
+# =======================================================
+# Contoh Pemanggilan Program
+# =======================================================
+if __name__ == "__main__":
+
+    # ---- QC SEISMIK ----
+    data_seismik = [
+        {"survey": "S1", "trace_id": 1, "offset": 120},
+        {"survey": "S1", "trace_id": 2, "offset": 70},
+        {"survey": "S2", "trace_id": 1, "offset": 200},
+        {"survey": "S2", "trace_id": 2, "offset": 90},
+    ]
+
+    laporan_qc = qc_seismik(data_seismik, ambang_offset=100)
+    print("=== QC SEISMIK ===")
+    print(laporan_qc)
+
+
+    # ---- STATISTIK GRAVITASI ----
+    data_grav = {
+        "S1": [9.81, 9.75, 9.80],
+        "S2": [9.70, 9.76],
+    }
+
+    hasil_grav = statistik_gravitasi(data_grav)
+    print("\n=== STATISTIK GRAVITASI ===")
+    print(hasil_grav)
+
+
+    # ---- ANALISIS MAGNETIK ----
+    data_mag = {
+        "S1": [120, 130, 130, 140],
+        "S2": [100, 110, 140, 150]
+    }
+
+    hasil_mag = analisis_magnetik(data_mag)
+    print("\n=== ANALISIS MAGNETIK ===")
+    print(hasil_mag)
