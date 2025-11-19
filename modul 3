@@ -1,0 +1,90 @@
+import random
+
+# ============================================================
+# KELAS DASAR
+# ============================================================
+
+class Sensor:
+    def __init__(self, sensor_id, lokasi):
+        self.id = sensor_id
+        self.lokasi = lokasi
+        self.status = "OFF"
+        self.data = []
+
+    def aktifkan_sensor(self):
+        self.status = "ON"
+
+    def nonaktifkan_sensor(self):
+        self.status = "OFF"
+
+    def rekam_data(self):
+        if self.status == "ON":
+            nilai = random.uniform(0, 100)  # nilai acak
+            self.data.append(round(nilai, 2))
+        else:
+            print(f"Sensor {self.id} masih OFF! Aktivasi dulu.")
+
+    def rata_rata(self):
+        return round(sum(self.data) / len(self.data), 2) if self.data else 0
+
+
+# ============================================================
+# KELAS TURUNAN SENSOR SEISMIK
+# ============================================================
+
+class SensorSeismik(Sensor):
+    def __init__(self, sensor_id, lokasi, frekuensi_sampling):
+        super().__init__(sensor_id, lokasi)
+        self.frekuensi_sampling = frekuensi_sampling
+
+
+# ============================================================
+# KELAS TURUNAN SENSOR GRAVITASI
+# ============================================================
+
+class SensorGravitasi(Sensor):
+    def __init__(self, sensor_id, lokasi, sensitivitas):
+        super().__init__(sensor_id, lokasi)
+        self.sensitivitas = sensitivitas
+
+
+# ============================================================
+# FUNGSI TAMPILKAN LAPORAN TABEL
+# ============================================================
+
+def tampilkan_laporan(sensor_list):
+    print("\n================= LAPORAN SENSOR =================")
+    print(f"{'ID':<6}{'Lokasi':<12}{'Status':<8}{'Jumlah Data':<15}{'Rata-rata':<10}")
+
+    for s in sensor_list:
+        print(f"{s.id:<6}{s.lokasi:<12}{s.status:<8}{len(s.data):<15}{s.rata_rata():<10}")
+    print("===================================================\n")
+
+
+# ============================================================
+# PROGRAM UTAMA
+# ============================================================
+
+if __name__ == "__main__":
+
+    # Membuat list sensor
+    sensor_list = [
+        SensorSeismik("SS01", "Site-A", frekuensi_sampling=100),
+        SensorGravitasi("SG01", "Site-B", sensitivitas=0.001),
+        SensorSeismik("SS02", "Site-C", frekuensi_sampling=200)
+    ]
+
+    # Aktivasi semua sensor
+    for s in sensor_list:
+        s.aktifkan_sensor()
+
+    # Rekam 5 data acak untuk masing-masing sensor
+    for s in sensor_list:
+        for _ in range(5):
+            s.rekam_data()
+
+    # Nonaktifkan sensor pertama
+    sensor_list[0].nonaktifkan_sensor()
+
+    # Tampilkan laporan
+    tampilkan_laporan(sensor_list)
