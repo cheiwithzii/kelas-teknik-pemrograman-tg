@@ -1,0 +1,29 @@
+# ============================================
+# 1. PERMAINAN TEBAK ANGKA
+# ============================================
+
+angka_rahasia = 17
+tebakan = 0
+
+print("=== Permainan Tebak Angka ===")
+
+while tebakan != angka_rahasia:
+    tebakan = int(input("Tebak angkanya: "))
+    
+    if tebakan < angka_rahasia:
+        print("Terlalu kecil!")
+    elif tebakan > angka_rahasia:
+        print("Terlalu besar!")
+    else:
+        print("Benar! Kamu berhasil menebak angkanya.")
+
+
+# ============================================
+# 2. CETAK BILANGAN GENAP 1–20
+# ============================================
+
+print("\n=== Bilangan Genap 1–20 ===")
+
+for angka in range(1, 21):
+    if angka % 2 == 0:
+        print(angka)
