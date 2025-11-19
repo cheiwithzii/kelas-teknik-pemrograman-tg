@@ -1,0 +1,267 @@
+# analisis_seismik.py
+import os
+import sys
+from math import sqrt
+import numpy as np
+import pandas as pd
+from datetime import datetime
+
+def load_data(path="data_mikroseismik.csv"):
+    """Muat CSV menjadi DataFrame dan tunjukkan inspeksi awal."""
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"File tidak ditemukan: {path}. Pastikan file berada di folder yang sama.")
+    df = pd.read_csv(path)
+    print("=== Preview (5 baris pertama) ===")
+    print(df.head())
+    print("\n=== Info DataFrame ===")
+    print(df.info())
+    print("\n=== Descriptive Statistics ===")
+    print(df.describe(include='all'))
+    return df
+
+def sanitize_column_names(df):
+    """
+    Standardisasi nama kolom: hapus spasi ekstra dan lower-case,
+    namun kembalikan mapping ke nama asli untuk akses aman.
+    """
+    orig_cols = df.columns.tolist()
+    mapping = {}
+    for c in orig_cols:
+        key = c.strip()
+        key_norm = key.replace(" ", "_")
+        key_norm = key_norm.replace("-", "_")
+        mapping[key_norm.lower()] = c  # map normalized lower -> original
+    return mapping
+
+def ensure_required_columns(df, mapping):
+    """
+    Pastikan kolom penting ada. Return nama kolom asli untuk masing-masing field.
+    Diharapkan kolom (case-insensitive): waktu_utc, x_m, y_m, z_m, magnitudo
+    """
+    needed = ["waktu_utc", "x_m", "y_m", "z_m", "magnitudo"]
+    col_names = {}
+    for n in needed:
+        if n in mapping:
+            col_names[n] = mapping[n]
+        else:
+            # coba beberapa variasi umum
+            alt = None
+            for k in mapping:
+                if k.replace("_", "") == n.replace("_", ""):
+                    alt = mapping[k]
+                    break
+            if alt:
+                col_names[n] = alt
+            else:
+                raise KeyError(f"Kolom diperlukan '{n}' tidak ditemukan di file. Kolom yang ada: {list(mapping.values())}")
+    return col_names
+
+def clean_and_prepare(df, colnames):
+    """
+    - Filter magnitudo <= 0
+    - Tangani NaN di kolom penting (drop)
+    - Konversi Waktu_UTC ke datetime
+    - Tambah kolom Jarak_Horizontal_m
+    """
+    df2 = df.copy()
+
+    # Rename working columns to short names for convenience (but keep original names intact)
+    wcol = colnames["waktu_utc"]
+    xcol = colnames["x_m"]
+    ycol = colnames["y_m"]
+    zcol = colnames["z_m"]
+    mcol = colnames["magnitudo"]
+
+    # Convert Waktu_UTC to datetime (coerce errors -> NaT)
+    df2[wcol] = pd.to_datetime(df2[wcol], errors="coerce")
+
+    # Report number of NaT in time before drop (if any)
+    n_time_nat = df2[wcol].isna().sum()
+    if n_time_nat > 0:
+        print(f"Perhatian: {n_time_nat} baris memiliki Waktu_UTC tidak valid -> akan di-drop.")
+
+    # Ensure numeric types for coordinate/depth/magnitude
+    for c in [xcol, ycol, zcol, mcol]:
+        df2[c] = pd.to_numeric(df2[c], errors="coerce")
+
+    # Initial counts
+    initial_count = len(df2)
+
+    # Filter magnitudo > 0 (anggap magnitudo harus > 0)
+    mask_mag_valid = df2[mcol] > 0
+    df2 = df2[mask_mag_valid]
+    filtered_by_mag = initial_count - len(df2)
+    if filtered_by_mag > 0:
+        print(f"Dihapus {filtered_by_mag} baris karena Magnitudo <= 0 atau non-numeric.")
+
+    # Drop baris yang punya NaN di kolom penting: waktu, x, y, z, magnitudo
+    before_dropna = len(df2)
+    df2 = df2.dropna(subset=[wcol, xcol, ycol, zcol, mcol])
+    dropped_na = before_dropna - len(df2)
+    if dropped_na > 0:
+        print(f"Dihapus {dropped_na} baris karena nilai hilang pada kolom penting (Waktu/X/Y/Z/Magnitudo).")
+
+    # Hitung Jarak_Horizontal_m = sqrt(X_m^2 + Y_m^2) menggunakan numpy (vektor)
+    df2["Jarak_Horizontal_m"] = np.sqrt(df2[xcol].to_numpy()**2 + df2[ycol].to_numpy()**2)
+
+    # Reset index
+    df2 = df2.reset_index(drop=True)
+
+    print(f"Jumlah kejadian valid setelah cleaning: {len(df2)} (sebelum cleaning: {initial_count})")
+    return df2, {"waktu": wcol, "x": xcol, "y": ycol, "z": zcol, "m": mcol}
+
+def compute_statistics(df, cols):
+    """
+    Menghitung:
+    - kejadian magnitudo terbesar & terkecil (kembali baris lengkap)
+    - kedalaman rata-rata (Z_m)
+    - jumlah dangkal (Z > -1600) dan dalam (Z <= -1600)
+    - jumlah kejadian dengan Jarak_Horizontal_m < 500
+    """
+    stats = {}
+    if df.empty:
+        raise ValueError("DataFrame kosong setelah pembersihan. Tidak ada data untuk dianalisis.")
+
+    # Magnitudo max & min
+    idx_max = df[cols["m"]].idxmax()
+    idx_min = df[cols["m"]].idxmin()
+    stats["max_event"] = df.loc[idx_max]
+    stats["min_event"] = df.loc[idx_min]
+
+    # Kedalaman rata-rata (Z_m)
+    z_series = df[cols["z"]]
+    stats["z_mean"] = z_series.mean()
+
+    # Distribusi kedalaman: 'dangkal' (Z > -1600), 'dalam' (Z <= -1600)
+    dangkal_mask = df[cols["z"]] > -1600
+    dalam_mask = df[cols["z"]] <= -1600
+    stats["count_dangkal"] = dangkal_mask.sum()
+    stats["count_dalam"] = dalam_mask.sum()
+
+    # Count events within horizontal radius < 500 m
+    stats["count_within_500m"] = (df["Jarak_Horizontal_m"] < 500).sum()
+
+    # Total valid
+    stats["total_valid"] = len(df)
+
+    return stats
+
+def write_report(stats, df, cols, outfile="laporan_analisis.txt"):
+    """Tulis file laporan hasil analisis dalam format rapi."""
+    max_ev = stats["max_event"]
+    min_ev = stats["min_event"]
+
+    def format_event(row):
+        waktu = pd.to_datetime(row[cols["waktu"]])
+        waktu_str = waktu.strftime("%Y-%m-%d %H:%M:%S") if not pd.isna(waktu) else "N/A"
+        x = row[cols["x"]]
+        y = row[cols["y"]]
+        z = row[cols["z"]]
+        m = row[cols["m"]]
+        jarak = row["Jarak_Horizontal_m"]
+        return (waktu_str, x, y, z, m, jarak)
+
+    max_waktu, max_x, max_y, max_z, max_m, max_jarak = format_event(max_ev)
+    min_waktu, min_x, min_y, min_z, min_m, min_jarak = format_event(min_ev)
+
+    with open(outfile, "w", encoding="utf-8") as f:
+        f.write("LAPORAN ANALISIS MIKROSEISMIK\n")
+        f.write(f"Tanggal laporan: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n")
+        f.write("===============================================\n\n")
+
+        f.write(f"Jumlah total kejadian valid: {stats['total_valid']}\n\n")
+
+        f.write("Gempa termagnitudo (TERBESAR):\n")
+        f.write(f"  Waktu (UTC)     : {max_waktu}\n")
+        f.write(f"  Koordinat (X,Y) : ({max_x:.2f}, {max_y:.2f}) m\n")
+        f.write(f"  Kedalaman (Z)   : {max_z:.2f} m\n")
+        f.write(f"  Magnitudo       : {max_m:.2f}\n")
+        f.write(f"  Jarak horizontal: {max_jarak:.2f} m\n\n")
+
+        f.write("Gempa termagnitudo (TERKECIL):\n")
+        f.write(f"  Waktu (UTC)     : {min_waktu}\n")
+        f.write(f"  Koordinat (X,Y) : ({min_x:.2f}, {min_y:.2f}) m\n")
+        f.write(f"  Kedalaman (Z)   : {min_z:.2f} m\n")
+        f.write(f"  Magnitudo       : {min_m:.2f}\n")
+        f.write(f"  Jarak horizontal: {min_jarak:.2f} m\n\n")
+
+        f.write("Statistik kedalaman:\n")
+        f.write(f"  Kedalaman rata-rata (Z_m) : {stats['z_mean']:.2f} m\n")
+        f.write(f"  Jumlah gempa 'dangkal' (Z > -1600 m) : {stats['count_dangkal']}\n")
+        f.write(f"  Jumlah gempa 'dalam'   (Z <= -1600 m): {stats['count_dalam']}\n\n")
+
+        f.write(f"Jumlah kejadian dalam radius < 500 m : {stats['count_within_500m']}\n\n")
+
+        f.write("Catatan:\n")
+        f.write(" - Data telah dibersihkan: baris dengan Magnitudo <= 0 atau NaN di kolom penting di-drop.\n")
+        f.write(" - Waktu ditampilkan dalam format UTC.\n")
+
+    print(f"Laporan tertulis ke: {outfile}")
+
+def benchmark_list_vs_numpy(n=1_000_000):
+    """
+    Opsional: tunjukkan perbandingan performa sederhana
+    menjumlahkan n angka menggunakan loop list vs numpy sum.
+    """
+    import time
+    print("\n=== Benchmark sederhana: list vs numpy array ===")
+    lst = list(range(n))
+    start = time.time()
+    s1 = 0
+    for v in lst:
+        s1 += v
+    t_list = time.time() - start
+    arr = np.arange(n)
+    start = time.time()
+    s2 = arr.sum()
+    t_numpy = time.time() - start
+    print(f"List loop: {t_list:.4f} s, Numpy sum: {t_numpy:.4f} s")
+    print("Perbandingan: numpy jauh lebih cepat untuk operasi vektor.\n")
+
+def main(path="data_mikroseismik.csv"):
+    try:
+        df = load_data(path)
+    except FileNotFoundError as e:
+        print(e)
+        sys.exit(1)
+
+    # Normalisasi dan cek kolom
+    mapping = sanitize_column_names(df)
+    try:
+        colnames = ensure_required_columns(df, mapping)
+    except KeyError as e:
+        print("Kesalahan kolom:", e)
+        print("Kolom yang tersedia di file:", df.columns.tolist())
+        sys.exit(1)
+
+    # Bersihkan dan siapkan data
+    df_clean, cols = clean_and_prepare(df, colnames)
+
+    # Hitung statistik
+    try:
+        stats = compute_statistics(df_clean, cols)
+    except ValueError as e:
+        print("Error:", e)
+        sys.exit(1)
+
+    # Tulis laporan
+    write_report(stats, df_clean, cols, outfile="laporan_analisis.txt")
+
+    # Tampilkan ringkasan singkat ke console
+    print("\n=== Ringkasan ===")
+    print(f"Total kejadian valid: {stats['total_valid']}")
+    print(f"Magnitudo terbesar: {stats['max_event'][cols['m']]:.2f} pada {pd.to_datetime(stats['max_event'][cols['waktu']])}")
+    print(f"Magnitudo terkecil: {stats['min_event'][cols['m']]:.2f} pada {pd.to_datetime(stats['min_event'][cols['waktu']])}")
+    print(f"Kedalaman rata-rata: {stats['z_mean']:.2f} m")
+    print(f"Jumlah dangkal / dalam: {stats['count_dangkal']} / {stats['count_dalam']}")
+    print(f"Jumlah kejadian dalam radius <500 m: {stats['count_within_500m']}")
+
+    # Optional: jalankan benchmark singkat (komentar jika tidak diinginkan karena butuh waktu)
+    # benchmark_list_vs_numpy(1_000_000)
+
+if __name__ == "__main__":
+    # Jika ingin jalankan dengan file berbeda, panggil: python analisis_seismik.py path/to/file.csv
+    if len(sys.argv) > 1:
+        main(sys.argv[1])
+    else:
+        main()
