@@ -1,0 +1,41 @@
+import sqlite3
+import pandas as pd
+
+# Asumsi koneksi Python ke database (dalam kasus ini, in-memory SQLite)
+# Jika Anda menggunakan file geofisika.db, Anda akan menggunakan:
+# conn = sqlite3.connect('geofisika.db')
+conn = sqlite3.connect(':memory:')
+cursor = conn.cursor()
+
+# Pastikan tabel 'survey' ada dan terisi dengan data yang relevan
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS survey (
+    id_survey INTEGER PRIMARY KEY NOT NULL,
+    nama_survey TEXT NOT NULL,
+    lokasi TEXT,
+    tanggal TEXT,
+    metode TEXT
+);
+""")
+
+# Masukkan beberapa data contoh, termasuk 'Bandar Lampung'
+cursor.execute("""
+INSERT OR IGNORE INTO survey (id_survey, nama_survey, lokasi, tanggal, metode)
+VALUES 
+    (1, 'Survei Geolistrik C', 'Metro', '2025-05-15', 'Resistivitas'),
+    (2, 'Survei Geofisika A', 'Bandar Lampung', '2024-01-20', 'Seismik Refraksi'),
+    (3, 'Survei Geofisika B', 'Lampung Selatan', '2024-03-10', 'Geolistrik'),
+    (4, 'Survei Geofisika D', 'Bandar Lampung', '2024-06-01', 'Magnetik');
+""")
+conn.commit()
+
+# Query SELECT menggunakan Pandas
+query = "SELECT * FROM survey WHERE lokasi = 'Bandar Lampung'"
+df_bandar_lampung = pd.read_sql_query(query, conn)
+
+# Tampilkan hasilnya
+print("Data survei dari lokasi Bandar Lampung:")
+display(df_bandar_lampung)
+
+# Tutup koneksi
+conn.close()
