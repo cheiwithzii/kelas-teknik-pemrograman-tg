@@ -1,0 +1,24 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+# Membuat domain x
+x = np.linspace(0, 10, 400)
+
+# Membuat figure
+fig, ax = plt.subplots()
+line, = ax.plot(x, np.sin(x), lw=2)
+ax.set_ylim(-1.2, 1.2)
+ax.set_title("Gelombang dengan Damping")
+
+# Fungsi update dengan peredaman amplitudo
+def update(frame):
+    damping = 1 - frame/60        # amplitudo mengecil seiring waktu
+    y = damping * np.sin(x - 0.3*frame)
+    line.set_ydata(y)
+    return line,
+
+# Animasi
+ani = FuncAnimation(fig, update, frames=60, interval=80)
+
+plt.show()
